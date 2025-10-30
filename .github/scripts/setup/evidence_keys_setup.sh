@@ -14,14 +14,23 @@ set -euo pipefail
 ALIAS_DEFAULT="BookVerse-Evidence-Key"
 KEY_ALIAS="${EVIDENCE_KEY_ALIAS:-$ALIAS_DEFAULT}"
 
+# Get GitHub organization from environment or detect from current repo
+if [[ -n "${ORG:-}" ]]; then
+  GITHUB_ORG="$ORG"
+elif [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+  GITHUB_ORG="${GITHUB_REPOSITORY%%/*}"
+else
+  GITHUB_ORG="$(gh api user --jq .login 2>/dev/null || echo 'yonatanp-jfrog')"
+fi
+
 # Service repositories to check
 SERVICE_REPOS=(
-  "yonatanp-jfrog/bookverse-inventory"
-  "yonatanp-jfrog/bookverse-recommendations"
-  "yonatanp-jfrog/bookverse-checkout"
-  "yonatanp-jfrog/bookverse-platform"
-  "yonatanp-jfrog/bookverse-web"
-  "yonatanp-jfrog/bookverse-helm"
+  "${GITHUB_ORG}/bookverse-inventory"
+  "${GITHUB_ORG}/bookverse-recommendations"
+  "${GITHUB_ORG}/bookverse-checkout"
+  "${GITHUB_ORG}/bookverse-platform"
+  "${GITHUB_ORG}/bookverse-web"
+  "${GITHUB_ORG}/bookverse-helm"
 )
 
 echo "🔐 Evidence Keys Setup"
