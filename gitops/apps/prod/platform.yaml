@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-prod
+  namespace: argocd
+spec:
+  project: bookverse-prod
+  source:
+    repoURL: https://github.com/yonatanp-jfrog/bookverse-helm.git
+    targetRevision: main
+    path: charts/platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bookverse-prod
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true
+
+

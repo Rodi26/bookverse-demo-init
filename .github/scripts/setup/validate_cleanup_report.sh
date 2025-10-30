@@ -1,115 +1,298 @@
 #!/usr/bin/env bash
 
 # =============================================================================
-# CLEANUP REPORT VALIDATION SCRIPT
+# BookVerse Platform - Cleanup Report Validation Script
 # =============================================================================
-# Validates that a fresh cleanup report exists before allowing cleanup execution
-# Ensures reports are not older than 30 minutes for safety
+#
+# Validates cleanup report freshness and integrity before allowing cleanup execution.
+# Ensures reports are not stale (older than 30 minutes) and contain valid data.
+#
+# Exit Codes:
+#   0: Report is valid and fresh
+#   1: Report is missing, invalid, or stale
+#   2: Environment error (missing required variables)
+#
 # =============================================================================
 
 set -euo pipefail
 
-# Load shared utilities
-source "$(dirname "$0")/common.sh"
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
+source "${SCRIPT_DIR}/config.sh"
 
-# Initialize script
-init_script "$(basename "$0")" "Validating cleanup report freshness and availability"
+# Configuration
+CLEANUP_REPORT_FILE="${CLEANUP_REPORT_FILE:-.github/cleanup-report.json}"
+REPORT_TTL_MINUTES=30
 
-SHARED_REPORT_FILE=".github/cleanup-report.json"
-MAX_AGE_MINUTES=30
+#######################################
+# Validate cleanup report exists and is readable
+# Globals:
+#   CLEANUP_REPORT_FILE
+# Returns:
+#   0 if report exists and is readable, 1 otherwise
+#######################################
+validate_report_exists() {
+    if [[ ! -f "$CLEANUP_REPORT_FILE" ]]; then
+        log_error "Cleanup report not found: $CLEANUP_REPORT_FILE"
+        echo "Please run the 🔍 Discover Cleanup workflow first to generate a report."
+        return 1
+    fi
+    
+    if [[ ! -r "$CLEANUP_REPORT_FILE" ]]; then
+        log_error "Cleanup report is not readable: $CLEANUP_REPORT_FILE"
+        return 1
+    fi
+    
+    return 0
+}
 
-# Check if report file exists
-if [[ ! -f "$SHARED_REPORT_FILE" ]]; then
-    log_error "❌ No cleanup report found"
+#######################################
+# Validate cleanup report contains valid JSON
+# Globals:
+#   CLEANUP_REPORT_FILE
+# Returns:
+#   0 if report contains valid JSON, 1 otherwise
+#######################################
+validate_report_json() {
+    if ! jq empty "$CLEANUP_REPORT_FILE" 2>/dev/null; then
+        log_error "Cleanup report contains invalid JSON: $CLEANUP_REPORT_FILE"
+        return 1
+    fi
+    
+    return 0
+}
+
+#######################################
+# Validate cleanup report contains required fields
+# Globals:
+#   CLEANUP_REPORT_FILE
+# Returns:
+#   0 if report contains required fields, 1 otherwise
+#######################################
+validate_report_structure() {
+    local required_fields=(
+        ".metadata.timestamp"
+        ".metadata.project_key"
+        ".metadata.total_items"
+        ".plan"
+        ".status"
+    )
+    
+    for field in "${required_fields[@]}"; do
+        if ! jq -e "$field" "$CLEANUP_REPORT_FILE" >/dev/null 2>&1; then
+            log_error "Cleanup report missing required field: $field"
+            return 1
+        fi
+    done
+    
+    # Check that plan contains at least some data structures
+    local plan_fields=(
+        ".plan.repositories"
+        ".plan.applications"
+        ".plan.users"
+        ".plan.stages"
+        ".plan.builds"
+    )
+    
+    for field in "${plan_fields[@]}"; do
+        if ! jq -e "$field" "$CLEANUP_REPORT_FILE" >/dev/null 2>&1; then
+            log_warning "Cleanup report missing plan field: $field (will be treated as empty)"
+        fi
+    done
+    
+    return 0
+}
+
+#######################################
+# Validate cleanup report timestamp is fresh (within TTL)
+# Globals:
+#   CLEANUP_REPORT_FILE
+#   REPORT_TTL_MINUTES
+# Returns:
+#   0 if report is fresh, 1 if stale
+#######################################
+validate_report_freshness() {
+    local timestamp
+    timestamp=$(jq -r '.metadata.timestamp // empty' "$CLEANUP_REPORT_FILE")
+    
+    if [[ -z "$timestamp" ]]; then
+        log_error "Cleanup report missing timestamp"
+        return 1
+    fi
+    
+    # Convert timestamp to epoch seconds
+    local report_epoch
+    if ! report_epoch=$(date -d "$timestamp" +%s 2>/dev/null); then
+        log_error "Invalid timestamp format in cleanup report: $timestamp"
+        return 1
+    fi
+    
+    # Get current time
+    local current_epoch
+    current_epoch=$(date +%s)
+    
+    # Calculate age in minutes
+    local age_seconds=$((current_epoch - report_epoch))
+    local age_minutes=$((age_seconds / 60))
+    
+    log_info "Report age: $age_minutes minutes (TTL: $REPORT_TTL_MINUTES minutes)"
+    
+    if [[ $age_minutes -gt $REPORT_TTL_MINUTES ]]; then
+        log_error "Cleanup report is stale (${age_minutes}m old, max age: ${REPORT_TTL_MINUTES}m)"
+        echo "Report timestamp: $(date -d "$timestamp" '+%a, %b %d %Y %H:%M:%S %Z' 2>/dev/null || echo "$timestamp")"
+        echo "Please run the 🔍 Discover Cleanup workflow to generate a fresh report."
+        return 1
+    fi
+    
+    return 0
+}
+
+#######################################
+# Validate cleanup report project matches expected project
+# Globals:
+#   CLEANUP_REPORT_FILE
+#   PROJECT_KEY
+# Returns:
+#   0 if project matches, 1 otherwise
+#######################################
+validate_report_project() {
+    local report_project
+    report_project=$(jq -r '.metadata.project_key // empty' "$CLEANUP_REPORT_FILE")
+    
+    if [[ -z "$report_project" ]]; then
+        log_error "Cleanup report missing project key"
+        return 1
+    fi
+    
+    if [[ "$report_project" != "$PROJECT_KEY" ]]; then
+        log_error "Project key mismatch: report=$report_project, expected=$PROJECT_KEY"
+        return 1
+    fi
+    
+    return 0
+}
+
+#######################################
+# Validate cleanup report status is ready for cleanup
+# Globals:
+#   CLEANUP_REPORT_FILE
+# Returns:
+#   0 if status is valid, 1 otherwise
+#######################################
+validate_report_status() {
+    local status
+    status=$(jq -r '.status // empty' "$CLEANUP_REPORT_FILE")
+    
+    case "$status" in
+        "ready_for_cleanup")
+            log_success "Report status: ready for cleanup"
+            return 0
+            ;;
+        "cleanup_completed")
+            log_error "Report indicates cleanup already completed"
+            return 1
+            ;;
+        "stale_report")
+            log_error "Report marked as stale"
+            return 1
+            ;;
+        "")
+            log_error "Report missing status field"
+            return 1
+            ;;
+        *)
+            log_warning "Unknown report status: $status (proceeding with caution)"
+            return 0
+            ;;
+    esac
+}
+
+#######################################
+# Display cleanup report summary for user verification
+# Globals:
+#   CLEANUP_REPORT_FILE
+#######################################
+display_report_summary() {
+    log_step "Cleanup Report Summary"
+    
+    local project_key timestamp total_items
+    project_key=$(jq -r '.metadata.project_key // "unknown"' "$CLEANUP_REPORT_FILE")
+    timestamp=$(jq -r '.metadata.timestamp // "unknown"' "$CLEANUP_REPORT_FILE")
+    total_items=$(jq -r '.metadata.total_items // 0' "$CLEANUP_REPORT_FILE")
+    
+    echo "Project: $project_key"
+    echo "Generated: $(date -d "$timestamp" '+%a, %b %d %Y %H:%M:%S %Z' 2>/dev/null || echo "$timestamp")"
+    echo "Total items to delete: $total_items"
+    
+    # Show breakdown by resource type
+    if [[ -s "$CLEANUP_REPORT_FILE" ]]; then
+        local repos apps users stages builds oidc
+        repos=$(jq -r '.metadata.discovery_counts.repositories // 0' "$CLEANUP_REPORT_FILE")
+        apps=$(jq -r '.metadata.discovery_counts.applications // 0' "$CLEANUP_REPORT_FILE")
+        users=$(jq -r '.metadata.discovery_counts.users // 0' "$CLEANUP_REPORT_FILE")
+        stages=$(jq -r '.metadata.discovery_counts.stages // 0' "$CLEANUP_REPORT_FILE")
+        builds=$(jq -r '.metadata.discovery_counts.builds // 0' "$CLEANUP_REPORT_FILE")
+        oidc=$(jq -r '.metadata.discovery_counts.oidc // 0' "$CLEANUP_REPORT_FILE")
+        
+        echo "Breakdown:"
+        echo "  - Repositories: $repos"
+        echo "  - Applications: $apps"
+        echo "  - Users: $users"
+        echo "  - Stages: $stages"
+        echo "  - Builds: $builds"
+        echo "  - OIDC Integrations: $oidc"
+    fi
+    
     echo ""
-    log_info "📋 To run cleanup, you must first:"
-    log_info "   1. Run the 🔍 Discover Cleanup workflow"
-    log_info "   2. Wait for it to generate a fresh discovery report"
-    log_info "   3. Then run this cleanup workflow"
+}
+
+#######################################
+# Main validation function
+# Returns:
+#   0 if all validations pass, 1 otherwise
+#######################################
+main() {
+    log_step "Validating cleanup report for execution"
+    
+    # Validate environment
+    if [[ -z "${PROJECT_KEY:-}" ]]; then
+        log_error "PROJECT_KEY environment variable not set"
+        return 2
+    fi
+    
+    # Run all validations
+    local validation_failed=false
+    
+    if ! validate_report_exists; then
+        validation_failed=true
+    elif ! validate_report_json; then
+        validation_failed=true
+    elif ! validate_report_structure; then
+        validation_failed=true
+    elif ! validate_report_freshness; then
+        validation_failed=true
+    elif ! validate_report_project; then
+        validation_failed=true
+    elif ! validate_report_status; then
+        validation_failed=true
+    fi
+    
+    if [[ "$validation_failed" == "true" ]]; then
+        echo ""
+        log_error "Cleanup report validation failed"
+        return 1
+    fi
+    
+    # Display summary for user verification
     echo ""
-    log_error "🚨 CLEANUP BLOCKED: Discovery required"
-    exit 1
+    display_report_summary
+    
+    log_success "Cleanup report validation passed - ready for execution"
+    return 0
+}
+
+# Execute main function if script is run directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
 fi
-
-# Check if report is valid JSON and has required structure
-if ! jq -e '.metadata.timestamp' "$SHARED_REPORT_FILE" >/dev/null 2>&1; then
-    log_error "❌ Invalid cleanup report format"
-    echo ""
-    log_info "📋 The cleanup report appears to be corrupted."
-    log_info "   Please run the 🔍 Discover Cleanup workflow again."
-    echo ""
-    log_error "🚨 CLEANUP BLOCKED: Invalid report"
-    exit 1
-fi
-
-# Get report timestamp and validate age
-report_timestamp=$(jq -r '.metadata.timestamp' "$SHARED_REPORT_FILE")
-report_epoch=$(date -d "$report_timestamp" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$report_timestamp" +%s 2>/dev/null || echo "0")
-current_epoch=$(date +%s)
-age_minutes=$(( (current_epoch - report_epoch) / 60 ))
-
-if [[ $age_minutes -gt $MAX_AGE_MINUTES ]]; then
-    log_error "❌ Cleanup report is too old"
-    echo ""
-    log_info "📋 Report details:"
-    log_info "   • Generated: $report_timestamp"
-    log_info "   • Age: $age_minutes minutes"
-    log_info "   • Maximum allowed age: $MAX_AGE_MINUTES minutes"
-    echo ""
-    log_info "🔄 To proceed with cleanup:"
-    log_info "   1. Run the 🔍 Discover Cleanup workflow"
-    log_info "   2. Wait for fresh discovery to complete"
-    log_info "   3. Run cleanup within $MAX_AGE_MINUTES minutes"
-    echo ""
-    log_error "🚨 CLEANUP BLOCKED: Report expired"
-    # Mark report as stale to prevent accidental reuse
-    tmpfile=$(mktemp)
-    jq '.status = "stale_report"' "$SHARED_REPORT_FILE" > "$tmpfile" && mv "$tmpfile" "$SHARED_REPORT_FILE"
-    exit 1
-fi
-
-# Check report status
-report_status=$(jq -r '.status' "$SHARED_REPORT_FILE")
-if [[ "$report_status" != "ready_for_cleanup" ]]; then
-    log_error "❌ Cleanup report is not ready"
-    echo ""
-    log_info "📋 Report status: $report_status"
-    log_info "   Expected status: ready_for_cleanup"
-    echo ""
-    log_error "🚨 CLEANUP BLOCKED: Report not ready"
-    exit 1
-fi
-
-# Get counts from report
-total_items=$(jq -r '.metadata.total_items' "$SHARED_REPORT_FILE")
-project_key=$(jq -r '.metadata.project_key' "$SHARED_REPORT_FILE")
-
-# Validation successful - display report summary
-log_success "✅ Cleanup report validation passed"
-echo ""
-log_config "📋 Report Summary:"
-log_config "   • Project: $project_key"
-log_config "   • Generated: $report_timestamp ($age_minutes minutes ago)"
-log_config "   • Total items to delete: $total_items"
-log_config "   • Status: $report_status"
-echo ""
-
-# Display breakdown if available
-builds_count=$(jq -r '.metadata.discovery_counts.builds // 0' "$SHARED_REPORT_FILE")
-apps_count=$(jq -r '.metadata.discovery_counts.applications // 0' "$SHARED_REPORT_FILE")
-repos_count=$(jq -r '.metadata.discovery_counts.repositories // 0' "$SHARED_REPORT_FILE")
-users_count=$(jq -r '.metadata.discovery_counts.users // 0' "$SHARED_REPORT_FILE")
-stages_count=$(jq -r '.metadata.discovery_counts.stages // 0' "$SHARED_REPORT_FILE")
-
-log_config "🎯 Resource Breakdown:"
-log_config "   • 🔧 Builds: $builds_count"
-log_config "   • 🚀 Applications: $apps_count"
-log_config "   • 📦 Repositories: $repos_count"
-log_config "   • 👥 Users: $users_count"
-log_config "   • 🏷️ Stages: $stages_count"
-
-echo ""
-log_success "🎯 Ready to proceed with cleanup execution"
-
-# Finalize script
-finalize_script "$(basename "$0")"

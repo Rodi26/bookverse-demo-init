@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bookverse-helm-internal
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  name: bookverse-helm-internal
+  type: helm
+  url: "${JFROG_URL}/artifactory/bookverse-helm-internal-helm-nonprod-local"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bookverse-helm-release
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  name: bookverse-helm-release
+  type: helm
+  url: "${JFROG_URL}/artifactory/bookverse-helm-internal-helm-release-local"
+
+

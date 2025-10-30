@@ -1,403 +1,243 @@
-# BookVerse JFrog Platform Demo
-
-A comprehensive demo setup for the BookVerse microservices platform using JFrog Platform (Artifactory + AppTrust).
+# BookVerse Platform
 
-## 🏗️ Architecture
+## Enterprise Microservices Platform with Secure Software Supply Chain Management
 
-BookVerse is a SaaS solution comprising three microservices and a combined Platform solution:
+![BookVerse Homepage](images/bookverse-homepage.png)
+*BookVerse web application showcasing the complete microservices platform with product catalog, recommendations, and checkout functionality*
 
-- **Inventory Service** - Manages book inventory and availability
-- **Recommendations Service** - Provides personalized book recommendations  
-- **Checkout Service** - Handles purchase transactions and order processing
-- **Platform Solution** - Combined solution integrating all microservices
+BookVerse is a comprehensive microservices platform that delivers modern software development practices, secure CI/CD pipelines, and enterprise-grade deployment automation. Built with industry-leading technologies, BookVerse provides organizations with a complete reference architecture for scalable, secure, and compliant software delivery.
 
-## 🚀 Quick Start
+---
 
-### Prerequisites
-- JFrog Platform access with admin privileges
-- `curl` and `jq` installed
-- Bash shell
 
-### Environment Variables
-```bash
-export JFROG_URL="https://your-jfrog-instance.com"
-export JFROG_ADMIN_TOKEN="your-admin-token"
-```
-
-### GitHub Actions Variables (CI/CD bootstrap)
+## 🛡️ Enterprise Governance & Policy Framework
 
-Set common variables across all BookVerse repos (requires a GitHub token with repo scope):
+BookVerse implements **comprehensive unified policies** that demonstrate enterprise-grade governance, security, and compliance capabilities:
 
-```bash
-export GH_TOKEN=ghp_your_token
-export ORG=your-org              # optional; falls back to user if unset
-export PROJECT_KEY=bookverse
-export JFROG_URL=https://your-jfrog-instance.com
-export DOCKER_REGISTRY=registry.example.com/bookverse
-bash scripts/set_actions_vars.sh
-```
+### **🎯 14 Automated Policy Gates**
+- **DEV Stage**: Quality gates, security scanning, and traceability requirements
+- **QA Stage**: Dynamic security testing and comprehensive API validation  
+- **STAGING Stage**: Penetration testing, change management, and infrastructure scanning
+- **PROD Release**: Multi-stage completion verification and approval workflows
 
-This will set `PROJECT_KEY`, `JFROG_URL`, and `DOCKER_REGISTRY` as Actions variables in:
-`bookverse-inventory`, `bookverse-recommendations`, `bookverse-checkout`, `bookverse-platform`, `bookverse-demo-assets`.
-
-### 📦 Provision Artifactory Repositories (Steady State)
+### **🔒 Security by Design**
+- **SLSA Provenance**: Supply chain security with cryptographic verification
+- **Multi-Layer Security**: SAST, DAST, penetration testing, and IaC scanning
+- **Evidence Collection**: Automated evidence gathering with cryptographic signing
+- **Audit Compliance**: Complete audit trails for regulatory and enterprise requirements
 
-Provision the required repositories once during initialization using the setup script (CI will not create repos dynamically):
+### **⚡ Automated Enforcement**
+- **CI/CD Integration**: Policies automatically enforced during promotion workflows
+- **Real-time Evaluation**: Policy compliance evaluated in real-time during deployments
+- **Blocking & Warning Modes**: Configurable enforcement levels for different environments
+- **Compliance Reporting**: Comprehensive dashboards and audit reporting
 
-```bash
-cd bookverse-demo-init/.github/scripts/setup
-export JFROG_URL="https://your-jfrog-instance.com"
-export JFROG_ADMIN_TOKEN="your-admin-token"
-export PROJECT_KEY=bookverse
-./create_repositories.sh
-```
+**📋 Learn More**: Explore the complete [Governance Framework](docs/ARCHITECTURE.md#%EF%B8%8F-governance--policy-framework) in our architecture documentation.
 
-Creates/ensures (among others):
-- `${PROJECT_KEY}-generic-internal-local`
-- `${PROJECT_KEY}-helm-helm-internal-local`
-- `${PROJECT_KEY}-{service}-docker-internal-local` for `inventory`, `recommendations`, `checkout`, `platform`, `web`
+---
 
-### 🔄 Switch Platform
+## 🎯 Where Do You Want to Start?
 
-To switch to a different JFrog Platform instance:
+Choose your path based on your needs:
 
-#### Option 1: GitHub Actions Workflow (Recommended)
-1. Go to Actions → "🔄 Switch Platform"
-2. Provide new platform URL and admin token
-3. Type `SWITCH` to confirm
-4. All repositories updated automatically
+- **🚀 Quick Start**: Follow the [Getting Started Guide](docs/GETTING_STARTED.md) for rapid deployment
+- **🏗️ Deep Dive**: Explore the [Platform Architecture Overview](docs/ARCHITECTURE.md) for detailed system understanding  
+- **🎮 Demo**: Run through the [Demo Runbook](docs/DEMO_RUNBOOK.md) for hands-on experience
 
-#### Option 2: Interactive Script
-```bash
-./scripts/switch_jfrog_platform_interactive.sh
-```
+---
 
-See [SWITCH_JFROG_PLATFORM.md](docs/SWITCH_JFROG_PLATFORM.md) for detailed instructions.
+## 🏗️ Platform Architecture
 
-## 🔑 Evidence Key Management
+BookVerse consists of seven integrated components that work together to deliver a complete microservices ecosystem, each showcasing different CI/CD patterns and deployment strategies:
 
-### Replace Evidence Keys
-Replace evidence keys across all BookVerse repositories with custom key pairs:
+### 📦 **Inventory Service**
 
-1. Generate key pair locally:
-   ```bash
-   # ED25519 (Recommended)
-   openssl genpkey -algorithm ed25519 -out private.pem
-   openssl pkey -in private.pem -pubout -out public.pem
-   
-   # RSA 2048-bit
-   openssl genrsa -out private.pem 2048
-   openssl rsa -in private.pem -pubout -out public.pem
-   
-   # Elliptic Curve (secp256r1)
-   openssl ecparam -name secp256r1 -genkey -noout -out private.pem
-   openssl ec -in private.pem -pubout > public.pem
-   ```
+#### Product catalog and stock management
 
-2. Go to **Actions** → **Replace Evidence Keys**
-3. Paste the private and public key contents
-4. The workflow will update all repositories and JFrog Platform
+- Real-time inventory tracking and availability management
+- RESTful API for catalog operations and stock queries
+- SQLite database with comprehensive book metadata
+- Automated stock level monitoring and alerts
 
-See [REPLACE_EVIDENCE_KEYS.md](docs/REPLACE_EVIDENCE_KEYS.md) for detailed instructions.
-
-### Easy Verbosity Control with Wrapper Scripts
-
-For convenience, we've created wrapper scripts that automatically set the correct verbosity level:
-
-#### Silent Execution (No Output)
-```bash
-./init_silent.sh
-# Runs completely silently, only shows success/failure at the end
-```
-
-#### Normal Feedback (Default)
-```bash
-./init_feedback.sh
-# Shows progress and results, no interaction needed
-```
-
-#### Interactive Debug
-```bash
-./init_debug.sh
-# Shows each command, asks for confirmation, displays full output
-```
-
-### Manual Verbosity Control
-
-You can also set verbosity manually and run the main script:
-
-```bash
-# Silent mode
-export VERBOSITY=0
-./init_local.sh
-
-# Feedback mode (default)
-export VERBOSITY=1
-./init_local.sh
-
-# Debug mode
-export VERBOSITY=2
-./init_local.sh
-```
-
-## 🎛️ Verbosity Control
-
-All scripts now include a **verbosity control system** for flexible output management.
-
-### Set Verbosity Level
-
-Set the `VERBOSITY` environment variable:
-
-```bash
-# Silent mode - no output, just execute
-export VERBOSITY=0
-
-# Feedback mode - show progress and results (default)
-export VERBOSITY=1
-
-# Debug mode - show commands, confirmations, and full output
-export VERBOSITY=2
-```
-
-### Verbosity Levels
-
-#### Level 0: Silent Mode
-- 🔇 **No output** will be shown
-- 🚀 **Commands execute silently**
-- ❌ **Only errors** will be displayed
-- 🤖 **Perfect for automation** and CI/CD pipelines
-
-#### Level 1: Feedback Mode (Default)
-- 📢 **Progress and results** will be shown
-- 🔧 **Commands execute automatically**
-- ✅ **No user interaction** required
-- 📊 **Summary information** displayed
-
-#### Level 2: Debug Mode
-- 🐛 **Each step shown** before execution
-- 🔍 **Commands displayed verbosely**
-- ⏸️ **User confirmation** required for each step
-- 📋 **Full output** from all commands
-- 🛠️ **Perfect for troubleshooting** and development
-
-### Usage Examples
-
-#### Silent Execution (Automation)
-```bash
-export VERBOSITY=0
-./init_local.sh
-# Runs completely silently, only shows errors
-```
-
-#### Normal Feedback (Default)
-```bash
-export VERBOSITY=1
-./init_local.sh
-# Shows progress and results, no interaction needed
-```
-
-#### Interactive Debug
-```bash
-export VERBOSITY=2
-./init_local.sh
-# Shows each command, asks for confirmation, displays full output
-```
-
-### What You'll See in Each Mode
-
-#### Silent Mode (VERBOSITY=0)
-```
-🚀 BookVerse JFrog Platform Initialization - Local Runner
-========================================================
-🔇 SILENT MODE ENABLED
-   - No output will be shown
-   - Commands will execute silently
-   - Only errors will be displayed
-
-✅ Environment variables validated
-📋 Configuration loaded
-🔄 Starting initialization sequence...
-[Silent execution - no further output until completion or error]
-```
-
-#### Feedback Mode (VERBOSITY=1)
-```
-🚀 BookVerse JFrog Platform Initialization - Local Runner
-========================================================
-📢 FEEDBACK MODE ENABLED
-   - Progress and results will be shown
-   - Commands will execute automatically
-   - No user interaction required
-
-✅ Environment variables validated
-📋 Configuration loaded
-🔄 Starting initialization sequence...
-
-📁 Step 1/7: Creating Project...
-   🔧 Creating BookVerse project...
-   ✅ Creating BookVerse project completed
-   📊 Step 1 Summary: Project creation process completed
-
-🎭 Step 2/7: Creating AppTrust Stages...
-   🔧 Creating bookverse-DEV stage...
-   ✅ Creating bookverse-DEV stage completed
-   🔧 Creating bookverse-QA stage...
-   ✅ Creating bookverse-QA stage completed
-   [Continues with progress updates...]
-```
-
-#### Debug Mode (VERBOSITY=2)
-```
-🚀 BookVerse JFrog Platform Initialization - Local Runner
-========================================================
-🐛 DEBUG MODE ENABLED
-   - Each step will be shown before execution
-   - Commands will be displayed verbosely
-   - User confirmation required for each step
-   - Full output will be shown
-
-✅ Environment variables validated
-📋 Configuration loaded
-🔄 Starting initialization sequence...
-
-📁 Step 1/7: Creating Project...
-🔍 DEBUG MODE: Create BookVerse project
-   Command to execute:
-   curl -v -w 'HTTP_CODE: %{http_code}' --header 'Authorization: Bearer ***' ...
-
-   Press Enter to execute this command, or 'q' to quit: 
-
-   🚀 Executing command...
-   =========================================
-   [Full curl output with headers, request, response]
-   =========================================
-   ✅ Command completed.
-
-   Press Enter to continue to next step: 
-```
-
-### Use Cases for Each Level
-
-#### VERBOSITY=0 (Silent)
-- **CI/CD Pipelines** - Automated execution
-- **Background Scripts** - Non-interactive runs
-- **Bulk Operations** - When you don't need feedback
-- **Testing** - Focus on results, not process
-
-#### VERBOSITY=1 (Feedback) - **Recommended for Most Users**
-- **Daily Development** - See what's happening
-- **Troubleshooting** - Understand progress
-- **Learning** - Follow the process
-- **Production** - Balanced output
-
-#### VERBOSITY=2 (Debug)
-- **Development** - Step-by-step debugging
-- **Troubleshooting** - See exact commands and responses
-- **Learning** - Understand every detail
-- **Testing** - Verify individual steps
-
-## 🧹 Cleanup
-
-### Local Cleanup
-```bash
-# Interactive cleanup with confirmation
-./cleanup_local.sh
-
-# Debug mode cleanup
-export VERBOSITY=2
-./cleanup_local.sh
-```
-
-### GitHub Actions Cleanup
-- Use the cleanup workflow in GitHub Actions
-- Requires typing "DELETE" to confirm
-
-### Manual Cleanup
-```bash
-# Delete specific resources manually
-curl -X DELETE "${JFROG_URL}/access/api/v1/projects/bookverse"
-```
-
-## 📋 What Gets Created
-
-### Projects
-- 1 JFrog Project: `bookverse`
-
-### Stages  
-- 3 Local Stages: `bookverse-DEV`, `bookverse-QA`, `bookverse-STAGING`
-- 1 Global Stage: `PROD` (always present)
-
-### Repositories
-- 16 Artifactory repositories (4 services × 2 package types × 2 stages)
-- Naming: `{project}-{service}-{package}-{stage}-local`
-
-### Users
-- 8 Human users with different roles
-- 4 Pipeline automation users
-
-### Applications
-- 4 Microservice applications (inventory, recommendations, checkout, platform)
-- Each with proper ownership and lifecycle management
-
-### OIDC Integrations
-- Secure authentication for GitHub Actions pipelines
-- Team-based access control
-
-## 🔐 Role Mapping
-
-| Business Role | JFrog Role | Description |
-|---------------|------------|-------------|
-| Developer | Developer | Code development and testing |
-| Release Manager | Release Manager | Release management and deployment |
-| Project Manager | Project Admin | Project administration |
-| AppTrust Admin | Application Admin | Application lifecycle management |
-
-## 📝 Naming Conventions
-
-- **Project**: `bookverse`
-- **Stages**: `bookverse-{STAGE}` (DEV, QA, STAGING)
-- **Repositories**: `{project}-{service}-{package}-{stage}-local`
-- **Applications**: `BookVerse {Service} Service`
-- **Users**: `{firstname}.{lastname}@bookverse.com`
-
-## ⚠️ Important Notes
-
-- **PROD stage** is system-managed and cannot be deleted
-- **Cleanup is irreversible** - all data will be permanently deleted
-- **Admin token required** - ensure proper permissions before running
-- **Stages must be removed from lifecycle** before deletion
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### HTTP 401 (Unauthorized)
-- Check if `JFROG_ADMIN_TOKEN` is valid and not expired
-- Verify token has admin permissions
-
-#### HTTP 409 (Conflict)
-- Resource already exists - this is normal for re-runs
-- Scripts handle this gracefully
-
-#### Project Deletion Fails
-- Ensure all stages are removed from lifecycle first
-- Delete applications, repositories, and users before project
-
-### Debug Commands
-
-```bash
-# Check lifecycle status
-curl "${JFROG_URL}/access/api/v2/lifecycle/?project_key=bookverse"
-
-# Check project stages
-curl "${JFROG_URL}/access/api/v2/stages/?project_key=bookverse"
-
-# Check project details
-curl "${JFROG_URL}/access/api/v1/projects/bookverse"
-```
-
-## 📚 Additional Resources
-
-- [JFrog REST API Documentation](https://jfrog.com/help/r/jfrog-rest-apis)
-- [JFrog CLI Documentation](https://jfrog.com/help/r/jfrog-cli)
-- [AppTrust Lifecycle Management](https://jfrog.com/help/r/jfrog-apptrust-lifecycle-management)
+**Build Pattern**: Single-container application - demonstrates basic containerized service deployment with minimal complexity
+
+### 🤖 **Recommendations Service**
+
+#### AI-powered personalized recommendations
+
+- Machine learning recommendation engine with configurable algorithms
+- Real-time recommendation generation (sub-200ms response times)
+- Scalable worker architecture for background processing
+- Configurable recommendation models and scoring factors
+
+**Build Pattern**: Multi-container orchestration - showcases complex service deployment with multiple Docker images, worker processes, and supporting artifacts
+
+### 💳 **Checkout Service**
+
+#### Order processing and payment management
+
+- Complete order lifecycle management from cart to fulfillment
+- Integrated payment processing with mock and real payment gateways
+- Order state tracking and inventory coordination
+- Event-driven architecture with order notifications
+
+**Build Pattern**: Service with dependencies - demonstrates deployment coordination with external services and database migrations
+
+### 🌐 **Web Application**
+
+#### Modern responsive frontend
+
+- Single-page application built with vanilla JavaScript
+- Responsive design with mobile-first approach
+- Real-time integration with all backend services
+- Client-side routing and state management
+
+**Build Pattern**: Static asset deployment - showcases frontend build pipelines with asset optimization and CDN distribution
+
+### 🏢 **Platform Service**
+
+#### Integration testing and validation
+
+- Cross-service integration testing as a unified platform
+- End-to-end validation of service interactions
+- Platform-wide health verification and monitoring
+- Component compatibility and version validation
+
+**Build Pattern**: Aggregation service - demonstrates platform-level testing patterns that validate multiple services working together
+
+### 🏗️ **Infrastructure Libraries**
+
+#### Shared libraries and DevOps tooling
+
+- Core business logic shared across services (bookverse-core)
+- DevOps automation and deployment scripts (bookverse-devops)
+- Common utilities and configuration management
+- Evidence collection and compliance frameworks
+
+**Build Pattern**: Multi-artifact library publishing - showcases shared library management with separate core and DevOps build pipelines
+
+### ⎈ **Helm Charts**
+
+#### Kubernetes deployment automation
+
+- Production-ready Helm charts for all services
+- Environment-specific configuration management
+- GitOps deployment workflows with ArgoCD integration
+- Automated scaling and resource management
+
+**Build Pattern**: Infrastructure as Code - demonstrates versioned deployment artifacts and environment promotion strategies
+
+### 🚀 **Demo Orchestration Layer**
+
+#### Platform setup and configuration automation (Demo Infrastructure)
+
+- Automated JFrog Platform provisioning and configuration
+- GitHub repository creation and CI/CD setup
+- OIDC integration and security configuration
+- Environment validation and health checking
+
+**Build Pattern**: Setup automation - showcases demo environment provisioning and platform configuration (not part of the BookVerse application itself)
+
+### Summary
+
+| Component | Purpose | Technology Stack | Deployment | Build Pattern |
+|-----------|---------|------------------|------------|---------------|
+| **Inventory** | Product catalog & inventory management | Python, FastAPI, SQLite | Container + K8s | Single-container |
+| **Recommendations** | AI-powered recommendation engine | Python, scikit-learn, FastAPI | Container + K8s | Multi-container |
+| **Checkout** | Order processing & payments | Python, FastAPI, PostgreSQL | Container + K8s | Service dependencies |
+| **Web App** | Frontend user interface | Vanilla JS, Vite, HTML5 | Static + CDN | Static assets |
+| **Platform** | Integration testing & validation | Python, FastAPI | Container + K8s | Aggregation service |
+| **Infrastructure** | Shared libraries & DevOps tooling | Python, Shell | Multi-artifact | Library publishing |
+| **Helm Charts** | K8s deployment automation | Helm 3, YAML | GitOps | Infrastructure as Code |
+| **Demo Orchestration** | Platform setup automation | Python, Shell, GitHub Actions | Automation | Setup automation |
+
+---
+
+## 🎯 Use Cases
+
+### 🏢 **Enterprise Development Teams**
+
+- Reference architecture for microservices transformation
+- Secure CI/CD pipeline implementation
+- Container orchestration and deployment automation
+- DevSecOps practices and compliance automation
+
+### 🔧 **DevOps Engineers**
+
+- Complete GitOps workflow implementation
+- Multi-environment deployment strategies
+- Infrastructure as Code patterns
+- Monitoring and observability setup
+
+### 🔐 **Security Teams**
+
+- Software supply chain security implementation
+- Zero-trust CI/CD pipeline design
+- Vulnerability management workflows
+- Compliance and audit trail automation
+
+### 🏗️ **Platform Engineers**
+
+- Microservices architecture patterns
+- Service mesh and API gateway configuration
+- Cross-service communication strategies
+- Platform engineering best practices
+
+---
+
+## 📚 Documentation
+
+### 🚀 **Platform Setup & Architecture**
+
+- [📖 **Getting Started**](docs/GETTING_STARTED.md) - Complete setup and deployment instructions
+- [🏗️ **Platform Architecture Overview**](docs/ARCHITECTURE.md) - System design and component relationships
+- [🎮 **Demo Runbook**](docs/DEMO_RUNBOOK.md) - Step-by-step demo execution guide
+- [⚙️ **Repository Architecture**](docs/REPO_ARCHITECTURE.md) - Code organization and structure
+
+### ⚙️ **Operations & Integration**
+
+- [🔄 **CI/CD Deployment**](docs/CICD_DEPLOYMENT_GUIDE.md) - Pipeline configuration and automation
+- [🔐 **OIDC Authentication**](docs/OIDC_AUTHENTICATION.md) - Zero-trust authentication setup
+- [🏗️ **Setup Automation**](docs/SETUP_AUTOMATION.md) - Platform provisioning and configuration
+- [📈 **Evidence Collection**](docs/EVIDENCE_COLLECTION.md) - Compliance and audit trail automation
+- [🚀 **GitOps Deployment**](docs/GITOPS_DEPLOYMENT.md) - Continuous deployment workflows
+- [🔗 **JFrog Integration**](docs/JFROG_INTEGRATION.md) - Artifact management and security
+
+### 🔧 **Advanced Topics**
+
+- [🔄 **Promotion Workflows**](docs/PROMOTION_WORKFLOWS.md) - Multi-stage deployment strategies
+- [🔑 **Evidence Key Deployment**](docs/EVIDENCE_KEY_DEPLOYMENT.md) - Cryptographic key management
+- [🔧 **JFrog Platform Switch**](docs/SWITCH_JFROG_PLATFORM.md) - Platform migration procedures
+
+---
+
+## 🌟 Platform Highlights
+
+- **Zero-Trust Security**: OIDC authentication, cryptographic evidence, SBOM generation, and vulnerability scanning
+- **Advanced CI/CD**: Multi-stage promotion, intelligent filtering, and comprehensive audit trails  
+- **Cloud-Native**: Container-first deployment with Kubernetes and GitOps integration
+- **Enterprise Ready**: Scalable architecture with monitoring, automated testing, and multi-environment support
+
+---
+
+## 🚀 Ready to Get Started?
+
+BookVerse provides everything you need to implement enterprise-grade microservices with secure, automated software delivery.
+
+**Choose your next step:**
+- **New to BookVerse?** Start with the [Getting Started Guide](docs/GETTING_STARTED.md)
+- **Want to understand the architecture?** Read the [Platform Architecture Overview](docs/ARCHITECTURE.md)
+- **Ready to run a demo?** Follow the [Demo Runbook](docs/DEMO_RUNBOOK.md)
+
+For additional support and documentation, explore the comprehensive guides above or visit the individual service repositories.
+
+---
+
+> **Note**: Individual service documentation is available in each service repository:
+> - [Inventory Service](https://github.com/yonatanp-jfrog/bookverse-inventory)
+> - [Recommendations Service](https://github.com/yonatanp-jfrog/bookverse-recommendations)  
+> - [Checkout Service](https://github.com/yonatanp-jfrog/bookverse-checkout)
+> - [Platform Service](https://github.com/yonatanp-jfrog/bookverse-platform)
+> - [Web Application](https://github.com/yonatanp-jfrog/bookverse-web)
+> - [Helm Charts](https://github.com/yonatanp-jfrog/bookverse-helm)
+> - [Infrastructure Libraries](https://github.com/yonatanp-jfrog/bookverse-infra)

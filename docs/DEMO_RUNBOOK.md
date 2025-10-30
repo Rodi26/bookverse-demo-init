@@ -34,7 +34,7 @@ This runbook provides step-by-step instructions for demonstrating JFrog AppTrust
 - `bookverse-platform` - Platform aggregation service
 - `bookverse-web` - Frontend web application
 - `bookverse-helm` - Kubernetes deployment charts
-- `bookverse-demo-assets` - GitOps and demo materials
+- `bookverse-demo-assets` - GitOps and demo materials (integrated as subfolder in bookverse-demo-init)
 
 ## Demo Preparation
 
@@ -42,7 +42,7 @@ This runbook provides step-by-step instructions for demonstrating JFrog AppTrust
 
 ```bash
 # Set required environment variables
-export JFROG_URL="https://evidencetrial.jfrog.io"
+export JFROG_URL="https://apptrustswampupc.jfrog.io"
 export JFROG_ADMIN_TOKEN=$(cat /Users/yonatanp/playground/JFROG_ADMIN_TOKEN)
 
 # Verify connectivity
@@ -78,8 +78,8 @@ done
 
 # Expected variables:
 # PROJECT_KEY=bookverse
-# JFROG_URL=https://evidencetrial.jfrog.io  
-# DOCKER_REGISTRY=evidencetrial.jfrog.io
+# JFROG_URL=https://apptrustswampupc.jfrog.io  
+# DOCKER_REGISTRY=apptrustswampupc.jfrog.io
 ```
 
 ## Demo Flow
@@ -134,7 +134,7 @@ done
 
 **Show in JFrog Platform:**
 1. **Published Artifacts**
-   - Navigate to `bookverse-inventory-docker-internal-local`
+   - Navigate to `bookverse-inventory-internal-docker-nonprod-local`
    - Show Docker images with metadata
    - Display build info and provenance
 
@@ -191,7 +191,7 @@ done
    gh repo view yonatanp-jfrog/bookverse-helm
    
    # Show GitOps configuration
-   gh repo view yonatanp-jfrog/bookverse-demo-assets
+   # Demo assets are now in repos/bookverse-demo-assets/ subfolder
    ```
 
 ### Phase 6: Security and Compliance (10 minutes)
@@ -237,6 +237,50 @@ curl -s --header "Authorization: Bearer ${JFROG_ADMIN_TOKEN}" \
   "${JFROG_URL}/artifactory/api/repositories" | \
   jq -r '.[] | select(.key | contains("bookverse")) | .key'
 ```
+
+**4. BookVerse Web Application Issues**
+
+*Problem*: Website shows broken design or can't connect to backend services
+
+*Symptoms*:
+- Empty pages or missing content
+- Network errors in browser console
+- Service connectivity indicators show "n/a"
+
+*Diagnosis*:
+```bash
+# Check web service status
+kubectl -n bookverse-prod get deployment platform-web
+kubectl -n bookverse-prod get pods -l app=platform-web
+
+# Verify configuration
+kubectl -n bookverse-prod exec deploy/platform-web -- cat /usr/share/nginx/html/config.js
+
+# Test backend connectivity (from local machine)
+curl -s http://localhost:8001/api/v1/books | jq '.books | length'  # Should return 20
+curl -s http://localhost:8003/health  # Should return {"status":"ok"}
+curl -s http://localhost:8002/health  # Should return {"status":"ok"}
+```
+
+*Solution for Local Development*:
+```bash
+# Fix backend URLs for local port-forwarding
+kubectl -n bookverse-prod exec deploy/platform-web -- sh -c 'cat > /usr/share/nginx/html/config.js <<EOF
+window.__BOOKVERSE_CONFIG__ = {
+  env: "DEV",
+  inventoryBaseUrl: "http://localhost:8001",
+  recommendationsBaseUrl: "http://localhost:8003", 
+  checkoutBaseUrl: "http://localhost:8002"
+};
+EOF'
+
+# Verify fix
+curl -s http://localhost:8080/config.js
+```
+
+*Root Cause*: The web application was configured to use internal Kubernetes service names (`http://inventory`) which are not accessible from the browser. For local development with port-forwarding, localhost URLs must be used.
+
+*Permanent Fix*: The `entrypoint.sh` script in bookverse-web has been updated to properly substitute environment variables. Ensure the heredoc uses `<<CFG` (not `<<'CFG'`) to enable variable expansion.
 
 ### Reset Demo Environment
 
@@ -285,9 +329,9 @@ gh workflow run 🚀-setup-platform.yml
 - Sample SBOMs and reports
 
 ### Supporting Documentation
-- `PLAN_OF_ACTION.md` - Complete implementation details
 - `REPO_ARCHITECTURE.md` - Technical architecture
 - `CONSTRAINTS.md` - Demo limitations and assumptions
+- `WEB_APPLICATION_TROUBLESHOOTING.md` - Web application configuration and troubleshooting guide
 
 ## Success Metrics
 

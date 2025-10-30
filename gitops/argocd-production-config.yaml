@@ -1,0 +1,109 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  server.insecure: "false"
+  
+  server.grpc.web: "true"
+  server.enable.grpc.web: "true"
+  
+  server.rootpath: "/"
+  
+  server.static.assets: "/shared/app"
+  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-server-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  url: https://argocd.demo
+  
+  
+  application.instanceLabelKey: argocd.argoproj.io/instance
+  
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-ingress
+  namespace: argocd
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    
+    
+    traefik.ingress.kubernetes.io/router.middlewares: argocd-argocd-headers@kubernetescrd
+    
+    traefik.ingress.kubernetes.io/router.priority: "10"
+    
+    traefik.ingress.kubernetes.io/router.rule: Host(`argocd.demo`)
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - argocd.demo
+    secretName: argocd-server-tls
+  rules:
+  - host: argocd.demo
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: argocd-headers
+  namespace: argocd
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: https
+      X-Forwarded-Port: "443"
+      X-Forwarded-Host: argocd.demo
+    
+    customResponseHeaders:
+      X-Frame-Options: DENY
+      X-Content-Type-Options: nosniff
+      X-XSS-Protection: "1; mode=block"
+      Referrer-Policy: strict-origin-when-cross-origin
+      Strict-Transport-Security: max-age=31536000; includeSubDomains
+    
+    contentSecurityPolicy: |
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: https:;
+      font-src 'self' data:;
+      connect-src 'self' wss: https:;
+      frame-ancestors 'none';
+      base-uri 'self';
+      form-action 'self';
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-server-tls
+  namespace: argocd
+type: kubernetes.io/tls
+data:
+  tls.crt: ""
+  tls.key: ""
