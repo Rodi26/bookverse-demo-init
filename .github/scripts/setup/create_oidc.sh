@@ -69,7 +69,7 @@ create_oidc_integration() {
     local service_name="$1"
     local username="$2"
     local display_name="$3"
-    local integration_name="github-${PROJECT_KEY}-${service_name}"
+    local integration_name="${PROJECT_KEY}-${service_name}-github"
     
     echo "Creating OIDC integration: $integration_name"
     echo "  Service: $service_name"
