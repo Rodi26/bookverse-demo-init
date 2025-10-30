@@ -197,7 +197,7 @@ update_all_repositories() {
     
     for repo in "${BOOKVERSE_REPOS[@]}"; do
         if update_repository_secrets_and_variables "$repo"; then
-            ((success_count++))
+            success_count=$((success_count + 1))
         fi
     done
     
