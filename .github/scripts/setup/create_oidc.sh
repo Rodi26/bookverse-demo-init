@@ -153,14 +153,18 @@ create_oidc_integration() {
     # Build identity mapping payload
     local mapping_payload=$(jq -n \
         --arg name "$integration_name" \
+        --arg provider_name "$integration_name" \
         --arg priority "1" \
         --arg repo "${org_name}/bookverse-${service_name}" \
         --arg username "$username" \
         '{
             "name": $name,
+            "provider_name": $provider_name,
             "description": ("Identity mapping for " + $name),
             "priority": ($priority | tonumber),
-            "claims_json": ("{\"repository\": \"" + $repo + "\"}"),
+            "claims": {
+                "repository": $repo
+            },
             "token_spec": {
                 "username": $username,
                 "scope": "applied-permissions/user"
