@@ -155,13 +155,16 @@ create_oidc_integration() {
         --arg name "$integration_name" \
         --arg priority "1" \
         --arg repo "${org_name}/bookverse-${service_name}" \
-        --arg token_spec "{\"username\": \"$username\", \"scope\": \"applied-permissions/user\"}" \
+        --arg username "$username" \
         '{
             "name": $name,
             "description": ("Identity mapping for " + $name),
             "priority": ($priority | tonumber),
-            "claims_json": ({"repository": $repo} | tostring),
-            "token_spec": ($token_spec | fromjson)
+            "claims_json": ("{\"repository\": \"" + $repo + "\"}"),
+            "token_spec": {
+                "username": $username,
+                "scope": "applied-permissions/user"
+            }
         }')
     
     # Create identity mapping (idempotent + retries)
