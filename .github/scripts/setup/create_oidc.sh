@@ -167,6 +167,9 @@ create_oidc_integration() {
             }
         }')
     
+    echo "DEBUG: Identity mapping payload:"
+    echo "$mapping_payload" | jq '.'
+    
     # Create identity mapping (idempotent + retries)
     if mapping_exists "$integration_name"; then
         echo "⚠️  Identity mapping for '$integration_name' already exists (pre-check)"
