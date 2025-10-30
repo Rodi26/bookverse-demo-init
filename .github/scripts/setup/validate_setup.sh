@@ -12,10 +12,20 @@ set -e
 # Load configuration
 source "$(dirname "$0")/config.sh"
 
+# Get GitHub organization from environment or detect from current repo
+if [[ -n "${ORG:-}" ]]; then
+  GITHUB_ORG="$ORG"
+elif [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+  GITHUB_ORG="${GITHUB_REPOSITORY%%/*}"
+else
+  GITHUB_ORG="$(gh api user --jq .login 2>/dev/null || echo 'yonatanp-jfrog')"
+fi
+
 echo ""
 echo "🔍 Validating complete BookVerse setup"
 echo "🔧 Project: $PROJECT_KEY"
 echo "🔧 JFrog URL: $JFROG_URL"
+echo "🐙 GitHub Org: $GITHUB_ORG"
 echo ""
 
 # Validation function
@@ -192,12 +202,12 @@ github_repos_ok=0
 
 for service in "${expected_repos[@]}"; do
     repo_name="bookverse-${service}"
-    if gh repo view "yonatanp-jfrog/${repo_name}" >/dev/null 2>&1; then
+    if gh repo view "${GITHUB_ORG}/${repo_name}" >/dev/null 2>&1; then
         echo "✅ Repository ${repo_name} exists"
         ((github_repos_ok++))
         
         # Check for workflows
-        if gh api "repos/yonatanp-jfrog/${repo_name}/contents/.github/workflows" >/dev/null 2>&1; then
+        if gh api "repos/${GITHUB_ORG}/${repo_name}/contents/.github/workflows" >/dev/null 2>&1; then
             echo "   ✅ Workflows directory exists"
         else
             echo "   ⚠️  No workflows directory found"
@@ -205,7 +215,7 @@ for service in "${expected_repos[@]}"; do
         
         # Check for variables (only for service repos)
         if [[ "$service" != "demo-assets" && "$service" != "helm" ]]; then
-            if gh variable list -R "yonatanp-jfrog/${repo_name}" | grep -q "PROJECT_KEY"; then
+            if gh variable list -R "${GITHUB_ORG}/${repo_name}" | grep -q "PROJECT_KEY"; then
                 echo "   ✅ Repository variables configured"
             else
                 echo "   ⚠️  Repository variables missing"
