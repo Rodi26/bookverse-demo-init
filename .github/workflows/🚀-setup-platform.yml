@@ -15,6 +15,7 @@ env:
   JFROG_URL: ${{ vars.JFROG_URL }}
   JFROG_ADMIN_TOKEN: ${{ secrets.JFROG_ADMIN_TOKEN }}
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  ORG: ${{ github.repository_owner }}
 
 jobs:
   setup-platform:
